@@ -94,6 +94,34 @@ def scrape_organization(url):
                     data["email"] = email_address
                 elif "web" in dt_texts:
                     data["website"] = text_value
+            parent_container = driver.find_element(By.CLASS_NAME, "multi-line")
+
+            # 2. Extract Address Raw (from the first dd)
+            address_element = parent_container.find_element(By.CLASS_NAME, "address")
+            full_text = address_element.text
+            address_raw = (
+                full_text.replace("Head office |", "").replace("Address", "").strip()
+            )
+            try:
+                # We loo    k specifically for the link containing 'maps.google'
+                map_link_element = parent_container.find_element(
+                    By.CSS_SELECTOR, "a[href*='google.co.uk/maps']"
+                )
+                google_map = map_link_element.get_attribute("href")
+            except:
+                google_map = "No Map Link Found"
+
+            # 4. Parsing the address components
+            parts = [p.strip() for p in address_raw.split(",")]
+
+            # Map the data
+            data = {
+                "address_raw": address_raw,
+                "city": parts[2] if len(parts) > 2 else "",
+                "postal_code": parts[-2] if len(parts) > 1 else "",
+                "country": parts[-1] if len(parts) > 0 else "",
+                "google_map": google_map,
+            }
 
         except Exception as e:
             print(f"Detail section missing: {e}")
@@ -101,6 +129,8 @@ def scrape_organization(url):
         # 3. Check Regulation Status
         if "not regulated by the sra" in driver.page_source.lower():
             data["is_sra_regulated"] = False
+
+        print("data", data)
 
     except Exception as e:
         print(f"Failed to scrape: {e}")
