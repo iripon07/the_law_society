@@ -44,6 +44,6 @@ def save_page_source_headless(url, filename="page_source.html"):
 # Example usage:
 # Replace "http://example.com" with the URL you want to scrape
 save_page_source_headless(
-    "https://solicitors.lawsociety.org.uk/office/539073/labrums-solicitors-llp",
-    "example_sources.html",
+    "https://solicitors.lawsociety.org.uk/search/results?Pro=True&Type=0&Location=London+Colney&LocationId=london-colney",
+    "main_page_source.html",
 )
