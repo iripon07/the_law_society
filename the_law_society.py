@@ -17,7 +17,7 @@ def get_blueprint_data(url):
     return {
         "sra_id": "Missing",
         "firm_name": "Missing",
-        "tradings_name": "Missing",
+        "trading_names": "Missing",
         "type": "Missing",
         "is_sra_regulated": True,
         "telephone": "Missing",
@@ -30,19 +30,12 @@ def get_blueprint_data(url):
         "postal_code": "Missing",
         "country": "Missing",
         "google_map": "Missing",
-        "practice_areas_branch": "Missing",
-        "practice_areas_org": "Missing",
-        "accreditations": "Missing",
-        "total_people": "Missing",
-        "total_solicitors": "Missing",
-        "total_sra_managers": "Missing",
-        "total_offices": "Missing",
+        "areas_of_practice_branch": "Missing",
+        "areas_of_practice_org": "Missing",
+        "people_office_struct_org": "Missing",
+        "people_office_struct_office": "Missing",
         "languages_at_branch": "Missing",
         "languages_at_org": "Missing",
-        "has_disabled_access": False,
-        "has_induction_loops": False,
-        "accepts_legal_aid": False,
-        "provides_sign_language": False,
     }
 
 
@@ -60,7 +53,7 @@ def main():
             print(f"Gathering links from search page {page_num}...")
             driver.get(url)
 
-            WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 40).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "solicitor-outer"))
             )
             solicitor_sections = driver.find_elements(By.CLASS_NAME, "solicitor-outer")
@@ -84,7 +77,7 @@ def main():
 
                 try:
                     driver.get(link)
-                    WebDriverWait(driver, 10).until(
+                    WebDriverWait(driver, 30).until(
                         EC.presence_of_element_located((By.TAG_NAME, "h1"))
                     )
 
@@ -97,28 +90,41 @@ def main():
                     dl_element = driver.find_element(
                         By.CSS_SELECTOR, "div.details-outer dl.single-lines"
                     )
+                    dl_element = driver.find_element(
+                        By.CSS_SELECTOR, "div.details-outer dl.single-lines"
+                    )
                     all_dts = dl_element.find_elements(By.TAG_NAME, "dt")
+
                     for dt in all_dts:
-                        dt_texts = dt.text.strip().lower()
-                        dd = dt.find_element(By.XPATH, "following-sibling::dd[1]")
-                        text_value = dd.text.strip()
-                        if "type" in dt_texts:
-                            current_data["type"] = text_value
+                        label = dt.text.strip().lower()
+                        # Find the immediately following dd element
+                        dd = dt.find_element(By.XPATH, "./following-sibling::dd[1]")
+                        value = dd.text.strip()
 
-                        elif "sra id" in dt_texts:
-                            current_data["sra_id"] = text_value.split("|")[0].strip()
-
-                        elif "sra regulated" not in dt_texts:
+                        if "sra id" in label:
+                            current_data["sra_id"] = value.split("|")[0].strip()
+                        elif "type" in label:
+                            current_data["type"] = value
+                        elif "trading names" in label:
+                            current_data["trading_names"] = value
+                        elif "telephone" in label:
+                            current_data["telephone"] = value
+                        elif "email" in label:
+                            try:
+                                email_elem = dd.find_element(
+                                    By.CLASS_NAME, "show-email"
+                                )
+                                current_data["email"] = email_elem.get_attribute(
+                                    "data-email"
+                                )
+                            except:
+                                current_data["email"] = "Not Found"
+                        elif "web" in label:
+                            current_data["website"] = value
+                        if "SRA Regulated" in driver.page_source:
+                            current_data["is_sra_regulated"] = True
+                        else:
                             current_data["is_sra_regulated"] = False
-                        elif "telephone" in dt_texts:
-                            current_data["telephone"] = text_value
-
-                        elif "email" in dt_texts:
-                            element = driver.find_element(By.CLASS_NAME, "show-email")
-                            email_address = element.get_attribute("data-email")
-                            current_data["email"] = email_address
-                        elif "web" in dt_texts:
-                            current_data["website"] = text_value
 
                     # Address Part
                     address_box = driver.find_element(By.CLASS_NAME, "multi-line")
@@ -140,54 +146,116 @@ def main():
                     ).get_attribute("href")
 
                     # 4. Sections Logic (Structure, Practices, etc.)
-                    sections = driver.find_elements(By.TAG_NAME, "section")
-                    for sec in sections:
+                    section_fields = driver.find_elements(By.TAG_NAME, "section")
 
-                        title = sec.find_element(By.TAG_NAME, "h2").text.strip().lower()
-                    if "people, offices and structure" in title:
-                        cols = sec.find_elements(
-                            By.CSS_SELECTOR,
-                            "div.accordion-inner-body-split-halves > div",
+                    for section_field in section_fields:
+                        headers = section_field.find_elements(By.TAG_NAME, "h2")
+                        if not headers:
+                            continue
+
+                        areas_titles = headers[0].text.strip().lower()
+                        # areas_titles = (
+                        #     section_field.find_elements(By.TAG_NAME, "h2")
+                        #     .text.strip()
+                        #     .lower()
+                        # )
+                        li_elements = section_field.find_elements(
+                            By.CSS_SELECTOR, "div.body ul li"
                         )
-                        if len(cols) >= 1:
-                            org_li = cols[0].find_elements(By.TAG_NAME, "li")
-                            current_data["total_people"] = ", ".join(
-                                [li.text.replace("\n", " ").strip() for li in org_li]
+
+                        if "areas of practice at this branch" in areas_titles:
+                            branch_list = []
+                            li_elements = section_field.find_elements(
+                                By.CSS_SELECTOR, "div.body ul li"
                             )
-                            for li in org_li:
-                                if "office" in li.text.lower():
-                                    current_data["total_offices"] = li.find_element(
-                                        By.TAG_NAME, "strong"
-                                    ).text
-                        if len(cols) >= 2:
-                            for li in cols[1].find_elements(By.TAG_NAME, "li"):
-                                txt, num = (
-                                    li.text.lower(),
-                                    li.find_element(By.TAG_NAME, "strong").text,
+                            for li in li_elements:
+                                name = driver.execute_script(
+                                    "return arguments[0].childNodes[0].textContent.trim();",
+                                    li,
                                 )
-                                if "solicitors" in txt:
-                                    current_data["total_solicitors"] = num
-                                elif "managers" in txt:
-                                    current_data["total_sra_managers"] = num
-
-                    elif "areas of practice" in title:
-                        items = [
-                            driver.execute_script(
-                                "return arguments[0].childNodes[0].textContent.trim();",
-                                li,
+                                if name:
+                                    branch_list.append(name)
+                            current_data["areas_of_practice_branch"] = ", ".join(
+                                branch_list
                             )
-                            for li in sec.find_elements(By.TAG_NAME, "li")
-                        ]
-                        res = ", ".join(filter(None, items))
-                        if "branch" in title:
-                            current_data["practice_areas_branch"] = res
-                        else:
-                            current_data["practice_areas_org"] = res
 
-                    elif "accessibility" in title:
-                        txt = sec.text.lower()
-                        current_data["has_disabled_access"] = "disabled access" in txt
-                        current_data["has_induction_loops"] = "induction loops" in txt
+                        elif "areas of practice at this organisation" in areas_titles:
+                            org_list = []
+                            li_elements = section_field.find_elements(
+                                By.CSS_SELECTOR, "div.body ul li"
+                            )
+                            for li in li_elements:
+                                name = driver.execute_script(
+                                    "return arguments[0].childNodes[0].textContent.trim();",
+                                    li,
+                                )
+                                if name:
+                                    org_list.append(name)
+                            current_data["areas_of_practice_org"] = ", ".join(org_list)
+                        elif "people, offices and structure" in areas_titles:
+                            halves = section_field.find_elements(
+                                By.CSS_SELECTOR,
+                                "div.accordion-inner-body-split-halves > div",
+                            )
+                            if len(halves) >= 1:
+                                org_list = []
+                                org_li_elements = halves[0].find_elements(
+                                    By.TAG_NAME, "li"
+                                )
+                                for li in org_li_elements:
+                                    raw_text = li.get_attribute("textContent")
+                                    clean_item = (
+                                        " ".join(raw_text.split())
+                                        .replace("in this organisation", "")
+                                        .strip()
+                                    )
+                                    if clean_item:
+                                        org_list.append(clean_item)
+                                        current_data["people_office_struct_org"] = (
+                                            ", ".join(org_list)
+                                        )
+
+                            if len(halves) >= 2:
+                                off_list = []
+                                off_li = halves[1].find_elements(By.TAG_NAME, "li")
+                                for li in off_li:
+                                    txt = li.get_attribute("textContent")
+                                    clean = (
+                                        " ".join(txt.split())
+                                        .replace("at this office", "")
+                                        .strip()
+                                    )
+                                    if clean:
+                                        off_list.append(clean)
+
+                                current_data["people_office_struct_office"] = ", ".join(
+                                    off_list
+                                )
+                        elif "languages spoken at this branch" in areas_titles:
+                            lang_list_branch = []
+                            li_elements = section_field.find_elements(
+                                By.CSS_SELECTOR, "div.body ul li"
+                            )
+                            for li in li_elements:
+                                lang_name = li.get_attribute("textContent").strip()
+                                # print("lang br", lang_name)
+                                if lang_name:
+                                    lang_list_branch.append(lang_name)
+                            current_data["languages_at_branch"] = ", ".join(
+                                lang_list_branch
+                            )
+
+                        elif "languages spoken at this organisation" in areas_titles:
+                            lang_list_org = []
+                            li_elements = section_field.find_elements(
+                                By.CSS_SELECTOR, "div.body ul li"
+                            )
+                            for li in li_elements:
+                                lang_name = li.get_attribute("textContent").strip()
+                                # print("lang org", lang_name)
+                                if lang_name:
+                                    lang_list_org.append(lang_name)
+                            current_data["languages_at_org"] = ", ".join(lang_list_org)
 
                 except Exception as e:
                     print(f"Error extracting {link}: {e}")
