@@ -1,49 +1,44 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+import csv
+import json
 import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 
-def save_page_source_headless(url, filename="page_source.html"):
-    # Configure Chrome options for headless mode
+def main():
     chrome_options = Options()
-    # chrome_options.add_argument(
-    #     "--headless=new"
-    # )  # Use the new headless mode if available
-    # chrome_options.add_argument("--no-sandbox")
-    # chrome_options.add_argument("--disable-gpu")
-
-    # Initialize the Chrome WebDriver with options
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--no-sandbox")
     driver = webdriver.Chrome(options=chrome_options)
 
     try:
-        # Navigate to the target URL
-        print("Searching")
-        driver.get(url)
+        links = []
 
-        # Wait for the page to load completely (adjust as needed)
-        time.sleep(15)
-        print("Got it")
+        for page_numbers in range(1, 6):
+            url = f"https://solicitors.lawsociety.org.uk/search/results?Pro=True&Type=0&Location=London+Colney&LocationId=london-colney&Page={page_numbers}"
+            print("Starting headless browser...")
+            driver.get(url)
+            time.sleep(30)
+            print(f"Page Title: {driver.title}")
 
-        # Retrieve the page source
-        page_source = driver.page_source
+            # Assuming 'driver' is already initialized
 
-        # Write the page source to a file with UTF-8 encoding
-        with open(filename, "w", encoding="utf-8") as file:
-            file.write(page_source)
-
-        print(f"Successfully saved page source to {filename}")
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
+            solicitor_sections = driver.find_elements(By.CLASS_NAME, "solicitor-outer")
+            for section in solicitor_sections:
+                link_element = section.find_element(By.CSS_SELECTOR, "h2 a")
+                relative_path = link_element.get_attribute("href")
+                if relative_path:
+                    links.append(relative_path)
 
     finally:
-        # Close the browser
         driver.quit()
+        print("Browser closed.")
 
 
-# Example usage:
-# Replace "http://example.com" with the URL you want to scrape
-save_page_source_headless(
-    "https://solicitors.lawsociety.org.uk/office/539073/labrums-solicitors-llp",
-    "example_sources.html",
-)
+if __name__ == "__main__":
+    main()

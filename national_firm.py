@@ -94,6 +94,9 @@ def scrape_organization(url):
                     data["email"] = email_address
                 elif "web" in dt_texts:
                     data["website"] = text_value
+
+            print("Data Check", data)
+
             parent_container = driver.find_element(By.CLASS_NAME, "multi-line")
 
             # 2. Extract Address Raw (from the first dd)
@@ -102,6 +105,7 @@ def scrape_organization(url):
             address_raw = (
                 full_text.replace("Head office |", "").replace("Address", "").strip()
             )
+            # data["address_raw"]: address_raw_text
             try:
                 # We loo    k specifically for the link containing 'maps.google'
                 map_link_element = parent_container.find_element(
@@ -122,6 +126,8 @@ def scrape_organization(url):
                 "country": parts[-1] if len(parts) > 0 else "",
                 "google_map": google_map,
             }
+
+            print("All data ", data)
 
         except Exception as e:
             print(f"Detail section missing: {e}")
